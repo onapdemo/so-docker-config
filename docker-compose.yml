@@ -1,0 +1,54 @@
+version: '2'
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: ${MTU}
+services:
+  mariadb:
+    image: mariadb:10.1.11
+    ports:
+      - "3306"
+    volumes:
+      - ./volumes/mariadb/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+      - ./volumes/mariadb/conf.d:/etc/mysql/conf.d
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+    hostname:
+      db.mso.testlab.openecomp.org
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "30m"
+        max-file: "5"
+  mso:
+    image: openecomp/mso
+    ports:
+      - "3904:3904"
+      - "3905:3905"
+      - "8080:8080"
+      - "9990:9990"
+    volumes:
+      - ./volumes/mso/chef-config:/shared
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - ONAP_IP=${OPENO_IP}
+    hostname:
+      mso.mso.testlab.openecomp.org
+    depends_on:
+      - mariadb
+    links:
+      - mariadb
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "30m"
+        max-file: "5"
+    command:
+      - /wait-for.sh
+      - -q
+      - -t
+      - "300"
+      - mariadb:3306
+      - --
+      - /opt/mso/scripts/start-jboss-server.sh
